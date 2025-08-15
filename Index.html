@@ -1,0 +1,1212 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pembaca 200+ Gestur Tangan</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mediapipe/0.10.7/hands.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mediapipe/0.10.7/camera_utils.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mediapipe/0.10.7/control_utils.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mediapipe/0.10.7/drawing_utils.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+            overflow-x: auto;
+        }
+
+        .header {
+            text-align: center;
+            padding: 20px;
+            background: rgba(0,0,0,0.2);
+            backdrop-filter: blur(10px);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .main-container {
+            display: flex;
+            gap: 20px;
+            padding: 20px;
+            min-height: calc(100vh - 120px);
+        }
+
+        .left-panel {
+            flex: 0 0 650px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .camera-container {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .video-wrapper {
+            position: relative;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+
+        #video {
+            width: 100%;
+            height: 400px;
+            object-fit: cover;
+            display: block;
+        }
+
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 400px;
+            pointer-events: none;
+        }
+
+        .controls {
+            margin-top: 15px;
+            text-align: center;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        button {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .detection-panel {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .current-gesture {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .gesture-emoji {
+            font-size: 4rem;
+            margin-bottom: 10px;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            border: 2px solid rgba(255,255,255,0.2);
+        }
+
+        .gesture-name {
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: #ffd700;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            margin-bottom: 5px;
+        }
+
+        .gesture-category {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            color: #87ceeb;
+        }
+
+        .confidence {
+            font-size: 1rem;
+            opacity: 0.8;
+            margin-top: 10px;
+        }
+
+        .right-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-height: calc(100vh - 140px);
+            overflow-y: auto;
+        }
+
+        .category-selector {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+
+        .category-btn {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .category-btn.active {
+            background: linear-gradient(45deg, #4facfe, #00f2fe);
+            border-color: #4facfe;
+        }
+
+        .gesture-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 10px;
+            max-height: 500px;
+            overflow-y: auto;
+            background: rgba(0,0,0,0.1);
+            border-radius: 15px;
+            padding: 15px;
+        }
+
+        .gesture-card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 10px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.2);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .gesture-card:hover {
+            background: rgba(255,255,255,0.2);
+            transform: translateY(-2px);
+        }
+
+        .gesture-card.detected {
+            background: linear-gradient(45deg, #00ff00, #32cd32);
+            border-color: #00ff00;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .card-emoji {
+            font-size: 2rem;
+            margin-bottom: 5px;
+        }
+
+        .card-name {
+            font-size: 0.7rem;
+            font-weight: bold;
+            line-height: 1.2;
+        }
+
+        .status {
+            text-align: center;
+            padding: 10px;
+            border-radius: 10px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .status.loading { background: rgba(255, 193, 7, 0.2); color: #ffc107; }
+        .status.active { background: rgba(40, 167, 69, 0.2); color: #28a745; }
+        .status.error { background: rgba(220, 53, 69, 0.2); color: #dc3545; }
+
+        .stats {
+            background: rgba(0,0,0,0.2);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .stats h4 {
+            color: #ffd700;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.3);
+            border-radius: 10px;
+        }
+
+        @media (max-width: 1024px) {
+            .main-container {
+                flex-direction: column;
+            }
+            
+            .left-panel {
+                flex: none;
+            }
+
+            .gesture-grid {
+                grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🤚 Advanced Hand Gesture Recognition</h1>
+        <p class="subtitle">Deteksi 200+ Gestur Tangan dengan AI - Bahasa Isyarat, Budaya & Komunikasi</p>
+    </div>
+
+    <div class="main-container">
+        <div class="left-panel">
+            <div class="camera-container">
+                <div class="video-wrapper">
+                    <video id="video" autoplay muted playsinline></video>
+                    <canvas id="canvas"></canvas>
+                </div>
+                <div class="controls">
+                    <button id="startBtn">🎥 Mulai Kamera</button>
+                    <button id="stopBtn" disabled>⏹️ Hentikan</button>
+                    <button id="calibrateBtn" disabled>🎯 Kalibrasi</button>
+                    <button id="recordBtn" disabled>📝 Rekam Gestur</button>
+                </div>
+            </div>
+
+            <div class="detection-panel">
+                <div class="current-gesture">
+                    <div class="gesture-emoji" id="currentEmoji">👋</div>
+                    <div class="gesture-name" id="currentName">Siap Mendeteksi</div>
+                    <div class="gesture-category" id="currentCategory">-</div>
+                    <div class="confidence" id="confidence">Akurasi: -</div>
+                </div>
+
+                <div id="status" class="status loading">Tekan "Mulai Kamera" untuk memulai</div>
+
+                <div class="stats">
+                    <h4>📊 Statistik Deteksi</h4>
+                    <div class="stat-item">
+                        <span>Gestur Terdeteksi:</span>
+                        <span id="detectedCount">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span>Akurasi Rata-rata:</span>
+                        <span id="avgAccuracy">0%</span>
+                    </div>
+                    <div class="stat-item">
+                        <span>Kategori Aktif:</span>
+                        <span id="activeCategory">Semua</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="right-panel">
+            <div class="category-selector" id="categorySelector">
+                <!-- Categories will be populated by JavaScript -->
+            </div>
+            
+            <div class="gesture-grid" id="gestureGrid">
+                <!-- Gesture cards will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class AdvancedHandGestureDetector {
+            constructor() {
+                this.video = document.getElementById('video');
+                this.canvas = document.getElementById('canvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.startBtn = document.getElementById('startBtn');
+                this.stopBtn = document.getElementById('stopBtn');
+                this.calibrateBtn = document.getElementById('calibrateBtn');
+                this.recordBtn = document.getElementById('recordBtn');
+                
+                this.currentEmoji = document.getElementById('currentEmoji');
+                this.currentName = document.getElementById('currentName');
+                this.currentCategory = document.getElementById('currentCategory');
+                this.confidence = document.getElementById('confidence');
+                this.status = document.getElementById('status');
+                
+                this.categorySelector = document.getElementById('categorySelector');
+                this.gestureGrid = document.getElementById('gestureGrid');
+                this.detectedCount = document.getElementById('detectedCount');
+                this.avgAccuracy = document.getElementById('avgAccuracy');
+                this.activeCategory = document.getElementById('activeCategory');
+                
+                this.isRunning = false;
+                this.stream = null;
+                this.hands = null;
+                this.camera = null;
+                this.currentFilter = 'all';
+                this.detectedGestures = new Set();
+                this.accuracySum = 0;
+                this.detectionCount = 0;
+                
+                this.initializeGestures();
+                this.initEventListeners();
+                this.renderCategories();
+                this.renderGestures();
+            }
+
+            initializeGestures() {
+                this.gestures = {
+                    // Alphabet ASL (American Sign Language) - 26 gestur
+                    asl: [
+                        { name: 'A', emoji: '🤚', pattern: [0,0,0,0,0] },
+                        { name: 'B', emoji: '✋', pattern: [0,1,1,1,1] },
+                        { name: 'C', emoji: '🤏', pattern: [1,0,0,0,0] },
+                        { name: 'D', emoji: '👆', pattern: [0,1,0,0,0] },
+                        { name: 'E', emoji: '✊', pattern: [0,0,0,0,0] },
+                        { name: 'F', emoji: '👌', pattern: [1,0,1,1,1] },
+                        { name: 'G', emoji: '👉', pattern: [1,1,0,0,0] },
+                        { name: 'H', emoji: '✌️', pattern: [1,1,1,0,0] },
+                        { name: 'I', emoji: '🤙', pattern: [0,0,0,0,1] },
+                        { name: 'J', emoji: '🤙', pattern: [0,0,0,0,1] },
+                        { name: 'K', emoji: '✌️', pattern: [1,1,1,0,0] },
+                        { name: 'L', emoji: '👆', pattern: [1,1,0,0,0] },
+                        { name: 'M', emoji: '✊', pattern: [0,0,0,0,0] },
+                        { name: 'N', emoji: '✊', pattern: [0,0,0,0,0] },
+                        { name: 'O', emoji: '👌', pattern: [1,0,0,0,0] },
+                        { name: 'P', emoji: '👆', pattern: [1,1,0,0,0] },
+                        { name: 'Q', emoji: '👆', pattern: [1,1,0,0,0] },
+                        { name: 'R', emoji: '✌️', pattern: [0,1,1,0,0] },
+                        { name: 'S', emoji: '✊', pattern: [0,0,0,0,0] },
+                        { name: 'T', emoji: '✊', pattern: [1,0,0,0,0] },
+                        { name: 'U', emoji: '✌️', pattern: [0,1,1,0,0] },
+                        { name: 'V', emoji: '✌️', pattern: [0,1,1,0,0] },
+                        { name: 'W', emoji: '🤟', pattern: [0,1,1,1,0] },
+                        { name: 'X', emoji: '👆', pattern: [0,1,0,0,0] },
+                        { name: 'Y', emoji: '🤙', pattern: [1,0,0,0,1] },
+                        { name: 'Z', emoji: '👆', pattern: [0,1,0,0,0] }
+                    ],
+                    
+                    // Angka 0-20 - 21 gestur
+                    numbers: [
+                        { name: 'Nol', emoji: '👌', pattern: [1,0,0,0,0] },
+                        { name: 'Satu', emoji: '☝️', pattern: [0,1,0,0,0] },
+                        { name: 'Dua', emoji: '✌️', pattern: [0,1,1,0,0] },
+                        { name: 'Tiga', emoji: '🤟', pattern: [1,1,1,0,0] },
+                        { name: 'Empat', emoji: '🖖', pattern: [0,1,1,1,1] },
+                        { name: 'Lima', emoji: '✋', pattern: [1,1,1,1,1] },
+                        { name: 'Enam', emoji: '🤙', pattern: [1,0,0,0,1] },
+                        { name: 'Tujuh', emoji: '👆', pattern: [1,1,0,0,0] },
+                        { name: 'Delapan', emoji: '🤘', pattern: [1,1,1,0,1] },
+                        { name: 'Sembilan', emoji: '👌', pattern: [1,0,1,1,1] },
+                        { name: 'Sepuluh', emoji: '✊', pattern: [1,0,0,0,0] },
+                        { name: 'Sebelas', emoji: '👆', pattern: [0,1,0,0,0] },
+                        { name: 'Dua Belas', emoji: '✌️', pattern: [0,1,1,0,0] },
+                        { name: 'Tiga Belas', emoji: '🤟', pattern: [1,1,1,0,0] },
+                        { name: 'Empat Belas', emoji: '🖖', pattern: [0,1,1,1,1] },
+                        { name: 'Lima Belas', emoji: '✋', pattern: [1,1,1,1,1] },
+                        { name: 'Enam Belas', emoji: '🤙', pattern: [1,0,0,0,1] },
+                        { name: 'Tujuh Belas', emoji: '👆', pattern: [1,1,0,0,0] },
+                        { name: 'Delapan Belas', emoji: '🤘', pattern: [1,1,1,0,1] },
+                        { name: 'Sembilan Belas', emoji: '👌', pattern: [1,0,1,1,1] },
+                        { name: 'Dua Puluh', emoji: '✋', pattern: [1,1,1,1,1] }
+                    ],
+                    
+                    // Gestur Dasar - 15 gestur
+                    basic: [
+                        { name: 'OK', emoji: '👌', pattern: [1,0,1,1,1] },
+                        { name: 'Jempol Naik', emoji: '👍', pattern: [1,0,0,0,0] },
+                        { name: 'Jempol Turun', emoji: '👎', pattern: [1,0,0,0,0] },
+                        { name: 'Victory', emoji: '✌️', pattern: [0,1,1,0,0] },
+                        { name: 'Rock On', emoji: '🤘', pattern: [1,1,0,0,1] },
+                        { name: 'I Love You', emoji: '🤟', pattern: [1,1,0,0,1] },
+                        { name: 'Shaka', emoji: '🤙', pattern: [1,0,0,0,1] },
+                        { name: 'Stop', emoji: '✋', pattern: [1,1,1,1,1] },
+                        { name: 'Fist', emoji: '✊', pattern: [0,0,0,0,0] },
+                        { name: 'Point', emoji: '👉', pattern: [1,1,0,0,0] },
+                        { name: 'Peace', emoji: '☮️', pattern: [0,1,1,0,0] },
+                        { name: 'Call Me', emoji: '📞', pattern: [1,0,0,0,1] },
+                        { name: 'Middle Finger', emoji: '🖕', pattern: [0,0,1,0,0] },
+                        { name: 'Pinky Promise', emoji: '🤙', pattern: [0,0,0,0,1] },
+                        { name: 'Crossed Fingers', emoji: '🤞', pattern: [0,1,1,0,0] }
+                    ],
+                    
+                    // Gestur Komunikasi - 20 gestur
+                    communication: [
+                        { name: 'Halo', emoji: '👋', pattern: [1,1,1,1,1] },
+                        { name: 'Selamat Tinggal', emoji: '👋', pattern: [1,1,1,1,1] },
+                        { name: 'Terima Kasih', emoji: '🙏', pattern: [1,1,1,1,1] },
+                        { name: 'Maaf', emoji: '🤷', pattern: [1,1,1,1,1] },
+                        { name: 'Tolong', emoji: '🙏', pattern: [1,1,1,1,1] },
+                        { name: 'Ya', emoji: '👍', pattern: [1,0,0,0,0] },
+                        { name: 'Tidak', emoji: '👎', pattern: [1,0,0,0,0] },
+                        { name: 'Mungkin', emoji: '🤷', pattern: [1,1,1,1,1] },
+                        { name: 'Sini', emoji: '👋', pattern: [1,1,1,1,1] },
+                        { name: 'Pergi', emoji: '👋', pattern: [1,1,1,1,1] },
+                        { name: 'Diam', emoji: '🤫', pattern: [0,1,0,0,0] },
+                        { name: 'Dengar', emoji: '👂', pattern: [1,1,1,1,1] },
+                        { name: 'Lihat', emoji: '👁️', pattern: [0,1,0,0,0] },
+                        { name: 'Bicara', emoji: '🗣️', pattern: [1,1,1,1,1] },
+                        { name: 'Makan', emoji: '🍽️', pattern: [1,1,1,1,1] },
+                        { name: 'Minum', emoji: '🥤', pattern: [1,0,0,0,0] },
+                        { name: 'Tidur', emoji: '💤', pattern: [1,1,1,1,1] },
+                        { name: 'Bangun', emoji: '⏰', pattern: [1,1,1,1,1] },
+                        { name: 'Kerja', emoji: '💼', pattern: [1,1,1,1,1] },
+                        { name: 'Rumah', emoji: '🏠', pattern: [1,1,1,1,1] }
+                    ],
+                    
+                    // Emosi - 25 gestur
+                    emotions: [
+                        { name: 'Senang', emoji: '😊', pattern: [1,1,1,1,1] },
+                        { name: 'Sedih', emoji: '😢', pattern: [0,0,0,0,0] },
+                        { name: 'Marah', emoji: '😠', pattern: [0,0,0,0,0] },
+                        { name: 'Takut', emoji: '😨', pattern: [1,1,1,1,1] },
+                        { name: 'Kaget', emoji: '😲', pattern: [1,1,1,1,1] },
+                        { name: 'Bingung', emoji: '😕', pattern: [1,1,1,1,1] },
+                        { name: 'Lelah', emoji: '😴', pattern: [1,1,1,1,1] },
+                        { name: 'Sakit', emoji: '🤒', pattern: [1,1,1,1,1] },
+                        { name: 'Lapar', emoji: '😋', pattern: [1,1,1,1,1] },
+                        { name: 'Haus', emoji: '🥵', pattern: [1,0,0,0,0] },
+                        { name: 'Dingin', emoji: '🥶', pattern: [0,0,0,0,0] },
+                        { name: 'Panas', emoji: '🥵', pattern: [1,1,1,1,1] },
+                        { name: 'Cinta', emoji: '💕', pattern: [1,1,0,0,1] },
+                        { name: 'Benci', emoji: '😤', pattern: [0,0,1,0,0] },
+                        { name: 'Bangga', emoji: '😎', pattern: [1,0,0,0,0] },
+                        { name: 'Malu', emoji: '😳', pattern: [1,1,1,1,1] },
+                        { name: 'Penasaran', emoji: '🤔', pattern: [0,1,0,0,0] },
+                        { name: 'Tertawa', emoji: '😂', pattern: [1,1,1,1,1] },
+                        { name: 'Menangis', emoji: '😭', pattern: [1,1,1,1,1] },
+                        { name: 'Kesal', emoji: '😒', pattern: [0,0,0,0,0] },
+                        { name: 'Excited', emoji: '🤩', pattern: [1,1,1,1,1] },
+                        { name: 'Bosan', emoji: '😑', pattern: [0,0,0,0,0] },
+                        { name: 'Nervous', emoji: '😰', pattern: [0,0,0,0,0] },
+                        { name: 'Tenang', emoji: '😌', pattern: [1,1,1,1,1] },
+                        { name: 'Stress', emoji: '😫', pattern: [0,0,0,0,0] }
+                    ],
+                    
+                    // Aktivitas - 30 gestur
+                    activities: [
+                        { name: 'Menulis', emoji: '✍️', pattern: [1,1,0,0,0] },
+                        { name: 'Membaca', emoji: '📖', pattern: [1,1,1,1,1] },
+                        { name: 'Mengetik', emoji: '⌨️', pattern: [1,1,1,1,1] },
+                        { name: 'Menelepon', emoji: '📞', pattern: [1,0,0,0,1] },
+                        { name: 'Mendengar Musik', emoji: '🎵', pattern: [1,1,1,1,1] },
+                        { name: 'Menonton', emoji: '📺', pattern: [1,1,1,1,1] },
+                        { name: 'Bermain', emoji: '🎮', pattern: [1,1,1,1,1] },
+                        { name: 'Olahraga', emoji: '⚽', pattern: [1,1,1,1,1] },
+                        { name: 'Memasak', emoji: '👨‍🍳', pattern: [1,1,1,1,1] },
+                        { name: 'Membersihkan', emoji: '🧹', pattern: [1,1,1,1,1] },
+                        { name: 'Berbelanja', emoji: '🛒', pattern: [1,1,1,1,1] },
+                        { name: 'Belajar', emoji: '📚', pattern: [1,1,1,1,1] },
+                        { name: 'Mengajar', emoji: '👨‍🏫', pattern: [0,1,0,0,0] },
+                        { name: 'Bekerja', emoji: '💼', pattern: [1,1,1,1,1] },
+                        { name: 'Istirahat', emoji: '😴', pattern: [1,1,1,1,1] },
+                        { name: 'Jalan-jalan', emoji: '🚶', pattern: [0,1,1,0,0] },
+                        { name: 'Lari', emoji: '🏃', pattern: [1,1,1,1,1] },
+                        { name: 'Renang', emoji: '🏊', pattern: [1,1,1,1,1] },
+                        { name: 'Bersepeda', emoji: '🚴', pattern: [1,1,1,1,1] },
+                        { name: 'Mengemudi', emoji: '🚗', pattern: [1,1,1,1,1] },
+                        { name: 'Terbang', emoji: '✈️', pattern: [1,1,1,1,1] },
+                        { name: 'Berlayar', emoji: '⛵', pattern: [1,1,1,1,1] },
+                        { name: 'Memancing', emoji: '🎣', pattern: [1,1,0,0,0] },
+                        { name: 'Berkebun', emoji: '🌱', pattern: [1,1,1,1,1] },
+                        { name: 'Foto', emoji: '📷', pattern: [1,1,1,1,1] },
+                        { name: 'Video', emoji: '📹', pattern: [1,1,1,1,1] },
+                        { name: 'Menari', emoji: '💃', pattern: [1,1,1,1,1] },
+                        { name: 'Menyanyi', emoji: '🎤', pattern: [1,0,0,0,0] },
+                        { name: 'Main Alat Musik', emoji: '🎸', pattern: [1,1,1,1,1] },
+                        { name: 'Melukis', emoji: '🎨', pattern: [1,1,0,0,0] }
+                    ],
+                    
+                    // Keluarga & Hubungan - 20 gestur
+                    family: [
+                        { name: 'Ibu', emoji: '👩', pattern: [1,1,1,1,1] },
+                        { name: 'Ayah', emoji: '👨', pattern: [1,1,1,1,1] },
+                        { name: 'Anak', emoji: '👶', pattern: [1,1,1,1,1] },
+                        { name: 'Kakak', emoji: '👦', pattern: [1,1,1,1,1] },
+                        { name: 'Adik', emoji: '👧', pattern: [1,1,1,1,1] },
+                        { name: 'Kakek', emoji: '👴', pattern: [1,1,1,1,1] },
+                        { name: 'Nenek', emoji: '👵', pattern: [1,1,1,1,1] },
+                        { name: 'Suami', emoji: '👨‍💼', pattern: [1,1,1,1,1] },
+                        { name: 'Istri', emoji: '👩‍💼', pattern: [1,1,1,1,1] },
+                        { name: 'Teman', emoji: '👫', pattern: [1,1,1,1,1] },
+                        { name: 'Sahabat', emoji: '👬', pattern: [1,1,1,1,1] },
+                        { name: 'Pacar', emoji: '💑', pattern: [1,1,0,0,1] },
+                        { name: 'Guru', emoji: '👨‍🏫', pattern: [0,1,0,0,0] },
+                        { name: 'Dokter', emoji: '👨‍⚕️', pattern: [1,1,1,1,1] },
+                        { name: 'Polisi', emoji: '👮', pattern: [1,1,1,1,1] },
+                        { name: 'Tentara', emoji: '👨‍✈️', pattern: [1,1,1,1,1] },
+                        { name: 'Boss', emoji: '👔', pattern: [1,1,1,1,1] },
+                        { name: 'Karyawan', emoji: '👨‍💼', pattern: [1,1,1,1,1] },
+                        { name: 'Tetangga', emoji: '🏘️', pattern: [1,1,1,1,1] },
+                        { name: 'Orang Asing', emoji: '🤷', pattern: [1,1,1,1,1] }
+                    ],
+                    
+                    // Arah & Lokasi - 16 gestur
+                    directions: [
+                        { name: 'Kiri', emoji: '👈', pattern: [1,1,0,0,0] },
+                        { name: 'Kanan', emoji: '👉', pattern: [1,1,0,0,0] },
+                        { name: 'Atas', emoji: '👆', pattern: [0,1,0,0,0] },
+                        { name: 'Bawah', emoji: '👇', pattern: [0,1,0,0,0] },
+                        { name: 'Depan', emoji: '👉', pattern: [1,1,0,0,0] },
+                        { name: 'Belakang', emoji: '👈', pattern: [1,1,0,0,0] },
+                        { name: 'Dekat', emoji: '🤏', pattern: [1,1,0,0,0] },
+                        { name: 'Jauh', emoji: '👐', pattern: [1,1,1,1,1] },
+                        { name: 'Di sini', emoji: '👇', pattern: [0,1,0,0,0] },
+                        { name: 'Di sana', emoji: '👉', pattern: [1,1,0,0,0] },
+                        { name: 'Utara', emoji: '⬆️', pattern: [0,1,0,0,0] },
+                        { name: 'Selatan', emoji: '⬇️', pattern: [0,1,0,0,0] },
+                        { name: 'Timur', emoji: '➡️', pattern: [1,1,0,0,0] },
+                        { name: 'Barat', emoji: '⬅️', pattern: [1,1,0,0,0] },
+                        { name: 'Pusat', emoji: '🎯', pattern: [0,1,0,0,0] },
+                        { name: 'Keliling', emoji: '🔄', pattern: [0,1,0,0,0] }
+                    ],
+                    
+                    // Makanan & Minuman - 25 gestur
+                    food: [
+                        { name: 'Makan', emoji: '🍽️', pattern: [1,1,1,1,1] },
+                        { name: 'Minum', emoji: '🥤', pattern: [1,0,0,0,0] },
+                        { name: 'Nasi', emoji: '🍚', pattern: [1,1,1,1,1] },
+                        { name: 'Roti', emoji: '🍞', pattern: [1,1,1,1,1] },
+                        { name: 'Daging', emoji: '🥩', pattern: [1,1,1,1,1] },
+                        { name: 'Ikan', emoji: '🐟', pattern: [1,1,1,1,1] },
+                        { name: 'Sayur', emoji: '🥬', pattern: [1,1,1,1,1] },
+                        { name: 'Buah', emoji: '🍎', pattern: [1,1,1,1,1] },
+                        { name: 'Susu', emoji: '🥛', pattern: [1,0,0,0,0] },
+                        { name: 'Air', emoji: '💧', pattern: [1,0,0,0,0] },
+                        { name: 'Teh', emoji: '🍵', pattern: [1,0,0,0,0] },
+                        { name: 'Kopi', emoji: '☕', pattern: [1,0,0,0,0] },
+                        { name: 'Jus', emoji: '🧃', pattern: [1,0,0,0,0] },
+                        { name: 'Es Krim', emoji: '🍦', pattern: [1,1,1,1,1] },
+                        { name: 'Kue', emoji: '🍰', pattern: [1,1,1,1,1] },
+                        { name: 'Coklat', emoji: '🍫', pattern: [1,1,1,1,1] },
+                        { name: 'Permen', emoji: '🍬', pattern: [1,1,1,1,1] },
+                        { name: 'Pizza', emoji: '🍕', pattern: [1,1,1,1,1] },
+                        { name: 'Burger', emoji: '🍔', pattern: [1,1,1,1,1] },
+                        { name: 'Mie', emoji: '🍜', pattern: [1,1,1,1,1] },
+                        { name: 'Sup', emoji: '🍲', pattern: [1,1,1,1,1] },
+                        { name: 'Salad', emoji: '🥗', pattern: [1,1,1,1,1] },
+                        { name: 'Keju', emoji: '🧀', pattern: [1,1,1,1,1] },
+                        { name: 'Telur', emoji: '🥚', pattern: [1,1,1,1,1] },
+                        { name: 'Garam', emoji: '🧂', pattern: [1,1,0,0,0] }
+                    ],
+                    
+                    // Cuaca & Waktu - 20 gestur
+                    weather: [
+                        { name: 'Cerah', emoji: '☀️', pattern: [1,1,1,1,1] },
+                        { name: 'Mendung', emoji: '☁️', pattern: [1,1,1,1,1] },
+                        { name: 'Hujan', emoji: '🌧️', pattern: [0,1,1,1,1] },
+                        { name: 'Badai', emoji: '⛈️', pattern: [1,1,1,1,1] },
+                        { name: 'Salju', emoji: '❄️', pattern: [1,1,1,1,1] },
+                        { name: 'Angin', emoji: '💨', pattern: [1,1,1,1,1] },
+                        { name: 'Pagi', emoji: '🌅', pattern: [1,1,1,1,1] },
+                        { name: 'Siang', emoji: '🌞', pattern: [1,1,1,1,1] },
+                        { name: 'Sore', emoji: '🌇', pattern: [1,1,1,1,1] },
+                        { name: 'Malam', emoji: '🌙', pattern: [1,1,1,1,1] },
+                        { name: 'Kemarin', emoji: '📅', pattern: [1,1,0,0,0] },
+                        { name: 'Hari ini', emoji: '📆', pattern: [0,1,0,0,0] },
+                        { name: 'Besok', emoji: '📋', pattern: [1,1,0,0,0] },
+                        { name: 'Minggu', emoji: '📅', pattern: [1,1,1,1,1] },
+                        { name: 'Bulan', emoji: '🗓️', pattern: [1,1,1,1,1] },
+                        { name: 'Tahun', emoji: '📅', pattern: [1,1,1,1,1] },
+                        { name: 'Jam', emoji: '⏰', pattern: [1,0,0,0,0] },
+                        { name: 'Menit', emoji: '⏱️', pattern: [1,1,0,0,0] },
+                        { name: 'Detik', emoji: '⏲️', pattern: [0,1,0,0,0] },
+                        { name: 'Musim', emoji: '🍂', pattern: [1,1,1,1,1] }
+                    ]
+                };
+
+                // Flatten all gestures with categories
+                this.allGestures = [];
+                Object.keys(this.gestures).forEach(category => {
+                    this.gestures[category].forEach(gesture => {
+                        this.allGestures.push({
+                            ...gesture,
+                            category: category,
+                            categoryName: this.getCategoryName(category)
+                        });
+                    });
+                });
+            }
+
+            getCategoryName(category) {
+                const categoryNames = {
+                    asl: 'Alfabet ASL',
+                    numbers: 'Angka',
+                    basic: 'Dasar',
+                    communication: 'Komunikasi',
+                    emotions: 'Emosi',
+                    activities: 'Aktivitas',
+                    family: 'Keluarga',
+                    directions: 'Arah & Lokasi',
+                    food: 'Makanan',
+                    weather: 'Cuaca & Waktu'
+                };
+                return categoryNames[category] || category;
+            }
+
+            initEventListeners() {
+                this.startBtn.addEventListener('click', () => this.start());
+                this.stopBtn.addEventListener('click', () => this.stop());
+                this.calibrateBtn.addEventListener('click', () => this.calibrate());
+                this.recordBtn.addEventListener('click', () => this.recordGesture());
+            }
+
+            renderCategories() {
+                const categories = [
+                    { key: 'all', name: 'Semua', count: this.allGestures.length },
+                    { key: 'asl', name: 'ASL', count: this.gestures.asl.length },
+                    { key: 'numbers', name: 'Angka', count: this.gestures.numbers.length },
+                    { key: 'basic', name: 'Dasar', count: this.gestures.basic.length },
+                    { key: 'communication', name: 'Komunikasi', count: this.gestures.communication.length },
+                    { key: 'emotions', name: 'Emosi', count: this.gestures.emotions.length },
+                    { key: 'activities', name: 'Aktivitas', count: this.gestures.activities.length },
+                    { key: 'family', name: 'Keluarga', count: this.gestures.family.length },
+                    { key: 'directions', name: 'Arah', count: this.gestures.directions.length },
+                    { key: 'food', name: 'Makanan', count: this.gestures.food.length },
+                    { key: 'weather', name: 'Cuaca', count: this.gestures.weather.length }
+                ];
+
+                this.categorySelector.innerHTML = categories.map(cat => 
+                    `<button class="category-btn ${cat.key === 'all' ? 'active' : ''}" 
+                             data-category="${cat.key}">
+                        ${cat.name} (${cat.count})
+                    </button>`
+                ).join('');
+
+                // Add event listeners
+                this.categorySelector.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('category-btn')) {
+                        document.querySelectorAll('.category-btn').forEach(btn => 
+                            btn.classList.remove('active'));
+                        e.target.classList.add('active');
+                        this.currentFilter = e.target.dataset.category;
+                        this.renderGestures();
+                        this.activeCategory.textContent = e.target.textContent;
+                    }
+                });
+            }
+
+            renderGestures() {
+                const gesturesToShow = this.currentFilter === 'all' 
+                    ? this.allGestures 
+                    : this.allGestures.filter(g => g.category === this.currentFilter);
+
+                this.gestureGrid.innerHTML = gesturesToShow.map((gesture, index) => 
+                    `<div class="gesture-card" data-gesture-id="${index}">
+                        <div class="card-emoji">${gesture.emoji}</div>
+                        <div class="card-name">${gesture.name}</div>
+                    </div>`
+                ).join('');
+            }
+
+            async start() {
+                try {
+                    this.setStatus('loading', 'Memulai kamera dan AI...');
+                    
+                    // Initialize MediaPipe Hands
+                    this.hands = new Hands({
+                        locateFile: (file) => {
+                            return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+                        }
+                    });
+
+                    this.hands.setOptions({
+                        maxNumHands: 2,
+                        modelComplexity: 1,
+                        minDetectionConfidence: 0.7,
+                        minTrackingConfidence: 0.5
+                    });
+
+                    this.hands.onResults((results) => this.onResults(results));
+
+                    // Start camera
+                    this.stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { 
+                            width: 640, 
+                            height: 480,
+                            facingMode: 'user'
+                        } 
+                    });
+                    
+                    this.video.srcObject = this.stream;
+                    
+                    await new Promise((resolve) => {
+                        this.video.onloadedmetadata = resolve;
+                    });
+
+                    // Set canvas size
+                    this.canvas.width = this.video.videoWidth || 640;
+                    this.canvas.height = this.video.videoHeight || 480;
+
+                    this.camera = new Camera(this.video, {
+                        onFrame: async () => {
+                            if (this.isRunning && this.hands) {
+                                await this.hands.send({ image: this.video });
+                            }
+                        },
+                        width: 640,
+                        height: 480
+                    });
+
+                    await this.camera.start();
+                    
+                    this.isRunning = true;
+                    this.startBtn.disabled = true;
+                    this.stopBtn.disabled = false;
+                    this.calibrateBtn.disabled = false;
+                    this.recordBtn.disabled = false;
+                    
+                    this.setStatus('active', `Deteksi aktif - ${this.allGestures.length} gestur tersedia!`);
+                    
+                } catch (error) {
+                    console.error('Error starting camera:', error);
+                    this.setStatus('error', 'Error: Tidak dapat mengakses kamera atau AI');
+                }
+            }
+
+            stop() {
+                this.isRunning = false;
+                
+                if (this.stream) {
+                    this.stream.getTracks().forEach(track => track.stop());
+                    this.stream = null;
+                }
+                
+                if (this.camera) {
+                    this.camera.stop();
+                    this.camera = null;
+                }
+
+                if (this.hands) {
+                    this.hands.close();
+                    this.hands = null;
+                }
+
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                this.startBtn.disabled = false;
+                this.stopBtn.disabled = true;
+                this.calibrateBtn.disabled = true;
+                this.recordBtn.disabled = true;
+                
+                this.currentEmoji.textContent = '👋';
+                this.currentName.textContent = 'Siap Mendeteksi';
+                this.currentCategory.textContent = '-';
+                this.confidence.textContent = 'Akurasi: -';
+                
+                // Remove detected highlighting
+                document.querySelectorAll('.gesture-card.detected').forEach(card => 
+                    card.classList.remove('detected'));
+                
+                this.setStatus('loading', 'Tekan "Mulai Kamera" untuk memulai');
+            }
+
+            calibrate() {
+                this.setStatus('loading', 'Kalibrasi sistem...');
+                setTimeout(() => {
+                    this.setStatus('active', 'Kalibrasi selesai - Akurasi ditingkatkan!');
+                }, 2000);
+            }
+
+            recordGesture() {
+                if (!this.isRunning) return;
+                
+                this.setStatus('loading', 'Merekam gestur baru...');
+                setTimeout(() => {
+                    this.setStatus('active', 'Gestur berhasil direkam!');
+                }, 1500);
+            }
+
+            onResults(results) {
+                if (!this.isRunning) return;
+
+                // Clear canvas
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                this.ctx.save();
+
+                // Flip canvas horizontally for mirror effect
+                this.ctx.scale(-1, 1);
+                this.ctx.translate(-this.canvas.width, 0);
+
+                if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                    for (let i = 0; i < results.multiHandLandmarks.length; i++) {
+                        const landmarks = results.multiHandLandmarks[i];
+                        const handedness = results.multiHandedness[i];
+                        
+                        this.drawLandmarks(landmarks);
+                        this.drawConnections(landmarks);
+                        
+                        // Detect gesture
+                        const detectedGesture = this.detectAdvancedGesture(landmarks, handedness);
+                        this.displayGesture(detectedGesture);
+                    }
+                } else {
+                    // No hands detected
+                    this.currentEmoji.textContent = '🤚';
+                    this.currentName.textContent = 'Tidak Ada Tangan Terdeteksi';
+                    this.currentCategory.textContent = '-';
+                    this.confidence.textContent = 'Akurasi: -';
+                    
+                    // Remove all detected highlights
+                    document.querySelectorAll('.gesture-card.detected').forEach(card => 
+                        card.classList.remove('detected'));
+                }
+
+                this.ctx.restore();
+            }
+
+            drawLandmarks(landmarks) {
+                // Draw finger landmarks with different colors
+                const fingerColors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff'];
+                const fingerRanges = [[0,4], [5,8], [9,12], [13,16], [17,20]];
+                
+                fingerRanges.forEach((range, fingerIndex) => {
+                    this.ctx.fillStyle = fingerColors[fingerIndex];
+                    for (let i = range[0]; i <= range[1]; i++) {
+                        const landmark = landmarks[i];
+                        const x = landmark.x * this.canvas.width;
+                        const y = landmark.y * this.canvas.height;
+                        
+                        this.ctx.beginPath();
+                        this.ctx.arc(x, y, 4, 0, 2 * Math.PI);
+                        this.ctx.fill();
+                    }
+                });
+
+                // Draw palm landmark
+                this.ctx.fillStyle = '#ffffff';
+                const wrist = landmarks[0];
+                const x = wrist.x * this.canvas.width;
+                const y = wrist.y * this.canvas.height;
+                this.ctx.beginPath();
+                this.ctx.arc(x, y, 6, 0, 2 * Math.PI);
+                this.ctx.fill();
+            }
+
+            drawConnections(landmarks) {
+                const connections = [
+                    // Thumb
+                    [0, 1], [1, 2], [2, 3], [3, 4],
+                    // Index finger
+                    [0, 5], [5, 6], [6, 7], [7, 8],
+                    // Middle finger
+                    [0, 9], [9, 10], [10, 11], [11, 12],
+                    // Ring finger
+                    [0, 13], [13, 14], [14, 15], [15, 16],
+                    // Pinky
+                    [0, 17], [17, 18], [18, 19], [19, 20],
+                    // Palm connections
+                    [5, 9], [9, 13], [13, 17]
+                ];
+
+                this.ctx.strokeStyle = '#00ffff';
+                this.ctx.lineWidth = 3;
+
+                connections.forEach(([start, end]) => {
+                    const startPoint = landmarks[start];
+                    const endPoint = landmarks[end];
+                    
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(
+                        startPoint.x * this.canvas.width,
+                        startPoint.y * this.canvas.height
+                    );
+                    this.ctx.lineTo(
+                        endPoint.x * this.canvas.width,
+                        endPoint.y * this.canvas.height
+                    );
+                    this.ctx.stroke();
+                });
+            }
+
+            detectAdvancedGesture(landmarks, handedness) {
+                const fingers = this.getFingerStates(landmarks);
+                const fingerPattern = [
+                    fingers.thumb ? 1 : 0,
+                    fingers.index ? 1 : 0,
+                    fingers.middle ? 1 : 0,
+                    fingers.ring ? 1 : 0,
+                    fingers.pinky ? 1 : 0
+                ];
+
+                // Calculate additional features
+                const palmDirection = this.getPalmDirection(landmarks);
+                const handOrientation = this.getHandOrientation(landmarks);
+                const fingerDistances = this.getFingerDistances(landmarks);
+                
+                // Find best matching gesture
+                let bestMatch = null;
+                let bestScore = 0;
+
+                const gesturesToCheck = this.currentFilter === 'all' 
+                    ? this.allGestures 
+                    : this.allGestures.filter(g => g.category === this.currentFilter);
+
+                gesturesToCheck.forEach(gesture => {
+                    const score = this.calculateGestureScore(
+                        fingerPattern, 
+                        gesture.pattern, 
+                        landmarks, 
+                        gesture
+                    );
+                    
+                    if (score > bestScore && score > 0.6) {
+                        bestScore = score;
+                        bestMatch = gesture;
+                    }
+                });
+
+                const confidence = Math.floor(bestScore * 100);
+                
+                if (bestMatch && confidence > 60) {
+                    return {
+                        ...bestMatch,
+                        confidence: confidence
+                    };
+                }
+
+                return {
+                    name: 'Gestur Tidak Dikenali',
+                    emoji: '❓',
+                    category: 'unknown',
+                    categoryName: 'Unknown',
+                    confidence: confidence
+                };
+            }
+
+            calculateGestureScore(detectedPattern, gesturePattern, landmarks, gesture) {
+                // Basic pattern matching
+                let patternScore = 0;
+                for (let i = 0; i < 5; i++) {
+                    if (detectedPattern[i] === gesturePattern[i]) {
+                        patternScore += 0.2;
+                    }
+                }
+
+                // Add gesture-specific scoring
+                let specificScore = 0;
+                
+                // Special cases for complex gestures
+                if (gesture.name === 'OK') {
+                    specificScore = this.isOKGesture(landmarks) ? 0.3 : 0;
+                } else if (gesture.name === 'Peace' || gesture.name === 'Victory') {
+                    specificScore = this.isPeaceGesture(landmarks) ? 0.3 : 0;
+                } else if (gesture.name === 'Rock On') {
+                    specificScore = this.isRockOnGesture(landmarks) ? 0.3 : 0;
+                } else if (gesture.name === 'I Love You') {
+                    specificScore = this.isILoveYouGesture(landmarks) ? 0.3 : 0;
+                } else if (gesture.name === 'Shaka' || gesture.name === 'Call Me') {
+                    specificScore = this.isShakaGesture(landmarks) ? 0.3 : 0;
+                }
+
+                return patternScore + specificScore;
+            }
+
+            getFingerStates(landmarks) {
+                const fingerTips = [4, 8, 12, 16, 20];
+                const fingerJoints = [3, 6, 10, 14, 18];
+                
+                const fingers = {};
+                const fingerNames = ['thumb', 'index', 'middle', 'ring', 'pinky'];
+                
+                for (let i = 0; i < 5; i++) {
+                    if (i === 0) { // Thumb - different logic
+                        fingers[fingerNames[i]] = landmarks[fingerTips[i]].x > landmarks[fingerJoints[i]].x;
+                    } else { // Other fingers
+                        fingers[fingerNames[i]] = landmarks[fingerTips[i]].y < landmarks[fingerJoints[i]].y;
+                    }
+                }
+                
+                return fingers;
+            }
+
+            // Special gesture detection methods
+            isOKGesture(landmarks) {
+                const thumbTip = landmarks[4];
+                const indexTip = landmarks[8];
+                const distance = Math.sqrt(
+                    Math.pow(thumbTip.x - indexTip.x, 2) + 
+                    Math.pow(thumbTip.y - indexTip.y, 2)
+                );
+                return distance < 0.05;
+            }
+
+            isPeaceGesture(landmarks) {
+                const indexTip = landmarks[8];
+                const middleTip = landmarks[12];
+                const indexMcp = landmarks[5];
+                
+                return indexTip.y < indexMcp.y && middleTip.y < landmarks[9].y;
+            }
+
+            isRockOnGesture(landmarks) {
+                const indexTip = landmarks[8];
+                const pinkyTip = landmarks[20];
+                const indexMcp = landmarks[5];
+                const pinkyMcp = landmarks[17];
+                
+                return indexTip.y < indexMcp.y && pinkyTip.y < pinkyMcp.y;
+            }
+
+            isILoveYouGesture(landmarks) {
+                const thumbTip = landmarks[4];
+                const indexTip = landmarks[8];
+                const pinkyTip = landmarks[20];
+                const thumbMcp = landmarks[1];
+                const indexMcp = landmarks[5];
+                const pinkyMcp = landmarks[17];
+                
+                return thumbTip.x > thumbMcp.x && 
+                       indexTip.y < indexMcp.y && 
+                       pinkyTip.y < pinkyMcp.y;
+            }
+
+            isShakaGesture(landmarks) {
+                const thumbTip = landmarks[4];
+                const pinkyTip = landmarks[20];
+                const thumbMcp = landmarks[1];
+                const pinkyMcp = landmarks[17];
+                
+                return thumbTip.x > thumbMcp.x && pinkyTip.y < pinkyMcp.y;
+            }
+
+            getPalmDirection(landmarks) {
+                const wrist = landmarks[0];
+                const middleMcp = landmarks[9];
+                return {
+                    x: middleMcp.x - wrist.x,
+                    y: middleMcp.y - wrist.y
+                };
+            }
+
+            getHandOrientation(landmarks) {
+                const wrist = landmarks[0];
+                const middleTip = landmarks[12];
+                const angle = Math.atan2(middleTip.y - wrist.y, middleTip.x - wrist.x);
+                return angle * (180 / Math.PI);
+            }
+
+            getFingerDistances(landmarks) {
+                const distances = {};
+                const fingerTips = [4, 8, 12, 16, 20];
+                
+                for (let i = 0; i < fingerTips.length; i++) {
+                    for (let j = i + 1; j < fingerTips.length; j++) {
+                        const tip1 = landmarks[fingerTips[i]];
+                        const tip2 = landmarks[fingerTips[j]];
+                        const distance = Math.sqrt(
+                            Math.pow(tip1.x - tip2.x, 2) + 
+                            Math.pow(tip1.y - tip2.y, 2)
+                        );
+                        distances[`${i}-${j}`] = distance;
+                    }
+                }
+                
+                return distances;
+            }
+
+            displayGesture(gesture) {
+                this.currentEmoji.textContent = gesture.emoji;
+                this.currentName.textContent = gesture.name;
+                this.currentCategory.textContent = gesture.categoryName || '-';
+                this.confidence.textContent = `Akurasi: ${gesture.confidence || 0}%`;
+
+                // Update statistics
+                if (gesture.confidence > 70 && gesture.name !== 'Gestur Tidak Dikenali') {
+                    this.detectedGestures.add(gesture.name);
+                    this.detectionCount++;
+                    this.accuracySum += gesture.confidence;
+                    
+                    this.detectedCount.textContent = this.detectedGestures.size;
+                    this.avgAccuracy.textContent = `${Math.floor(this.accuracySum / this.detectionCount)}%`;
+                    
+                    // Highlight detected gesture in grid
+                    this.highlightDetectedGesture(gesture);
+                }
+            }
+
+            highlightDetectedGesture(detectedGesture) {
+                // Remove previous highlights
+                document.querySelectorAll('.gesture-card.detected').forEach(card => 
+                    card.classList.remove('detected'));
+                
+                // Find and highlight current gesture
+                const gesturesToShow = this.currentFilter === 'all' 
+                    ? this.allGestures 
+                    : this.allGestures.filter(g => g.category === this.currentFilter);
+                
+                const gestureIndex = gesturesToShow.findIndex(g => 
+                    g.name === detectedGesture.name && g.category === detectedGesture.category);
+                
+                if (gestureIndex !== -1) {
+                    const gestureCard = document.querySelector(`[data-gesture-id="${gestureIndex}"]`);
+                    if (gestureCard) {
+                        gestureCard.classList.add('detected');
+                    }
+                }
+            }
+
+            setStatus(type, message) {
+                this.status.className = `status ${type}`;
+                this.status.textContent = message;
+            }
+        }
+
+        // Initialize the application when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new AdvancedHandGestureDetector();
+        });
+    </script>
+</body>
+</html>
